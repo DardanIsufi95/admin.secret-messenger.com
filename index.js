@@ -1,4 +1,5 @@
 require('dotenv').config()
+const fs = require("fs")
 const mysql = require('mysql2/promise')
 const express = require("express")
 const app = express()
@@ -7,8 +8,13 @@ const cookieParser = require('cookie-parser')
 const bodyParser = require('body-parser')
 const path = require('path')
 const http = require('http')
-const server = require('http').createServer(app); 
 const https = require('https')
+var privateKey = fs.readFileSync('sslcert/server.key');
+var certificate = fs.readFileSync('sslcert/server.crt');
+
+var credentials = {key: privateKey, cert: certificate};
+const server = require('https').createServer(credentials,app); 
+
 const cookie = require("cookie");
 const apiAgent = new https.Agent({
     maxSockets: process.env.MAX_API_OUT_CALLS || 50 ,
