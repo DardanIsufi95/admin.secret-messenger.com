@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+        integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+        integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous">
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"
+        integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous">
+    </script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"
+        integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous">
+    </script>
+    <script src="https://kit.fontawesome.com/81b624141c.js" crossorigin="anonymous"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.1/socket.io.js"
+        integrity="sha512-AcZyhRP/tbAEsXCCGlziPun5iFvcSUpEz2jKkx0blkYKbxU81F+iq8FURwPn1sYFeksJ+sDDrI5XujsqSobWdQ=="
+        crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="/public/css/login.css">
+    <title>Admin S&T Messenger</title>
+</head>
+
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <a class="navbar-brand"><i class="fas fa-comment-alt mr-1"></i>Admin S&T Messenger</a>
+        <a href="/logout" class="btn btn-sm btn-outline-danger float-right">Logout</a>
+    </nav>
+    <div class="container mt-2">
+        <h3>Profile</h1>
+            <hr>
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-secondary">Imported <a href="#" class="text-success" onclick="updateImported(event,this)"><i class="fas fa-sync"></i></a>
+                    </h6>
+                    <hr>
+                    <div id="imported-container">
+                        
+                    </div>
+                    <h6 class="text-secondary">New <a href="#" class="text-success" onclick="updateNotImported(event,this)"><i class="fas fa-sync"></i></a></h6>
+                    <hr>
+                    <div id="new-container">
+                        
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-secondary">Process</h6>
+                    <hr>
+                    <div id="process-container">
+
+                    </div>
+                </div>
+
+
+            </div>
+    </div>
+</body>
+<script src="/public/js/index.js"></script>
+<script>
+    function createElementFromHTML(htmlString) {
+        var div = document.createElement('div');
+        div.innerHTML = htmlString.trim();
+
+        // Change this to div.childNodes to support multiple top-level nodes
+        return div.firstChild; 
+    }
+
+
+
+    function updateImported(event,element){
+
+        event.preventDefault()
+        fetch(`/api/imported`).then(result=>{
+            return result.json()
+        }).then(json=>{
+            document.querySelector("#imported-container").innerHTML = ""
+            json.forEach(profile => {
+                let ele = createElementFromHTML(`
+                    <div class="alert alert-success" role="alert" data-profileID=${profile.id}>
+                        <span class="profile-name font-weight-bold">${profile.profileName}</span>
+                        <small class="last-import">${profile.importTimestamp}</small>
+                        <a href="#" class="float-right px-1" onclick="updateFavorites(event,this)"><i class="fas fa-star"></i></a>
+                        <a href="#" class="float-right px-1" onclick="updateNotes(event,this)"><i class="fas fa-clipboard"></i></a>
+                        <a href="#" class="float-right px-1" onclick="updateDialoges(event,this)"><i class="fas fa-comments"></i></a>
+                    </div>
+                `)
+                document.querySelector("#imported-container").append(ele)
+            });
+        })
+    }
+    
+    function updateNotImported(event,element){
+
+        event.preventDefault()
+        fetch(`/api/notimported`).then(result=>{
+            return result.json()
+        }).then(json=>{
+            document.querySelector("#new-container").innerHTML = ""
+            json.forEach(profile => {
+                let ele = createElementFromHTML(`
+                    <div class="alert alert-primary" role="alert" data-profileid='${profile.id}'>
+                        <span class="profile-name font-weight-bold">${profile.profileName}</span>
+                        <a href="#" class="float-right px-1" onclick="importInit(event,this)"><i class="fas fa-file-import"></i></a>
+                    </div>
+                `)
+                document.querySelector("#new-container").append(ele)
+            });
+        })
+    }
+
+    function importInit(event,element){
+        event.preventDefault()
+        let container = document.querySelector(`#process-container div[data-profileid="${element.parentElement.dataset.profileid}"]`)
+
+        if(container == null){
+            console.log(element.parentElement.dataset.profileid)
+            fetch(`/api/import/${element.parentElement.dataset.profileid}`).then(result=>{
+                return result.text()
+            }).then(json=>{
+                element.parentElement.remove()
+            })
+        }
+    }
+
+    const socket = io(window.location.host);
+
+    socket.on("event",(events)=>{
+        events.forEach(event=>{
+            let container = document.querySelector(`#process-container div[data-profileid="${event.id}"]`)
+
+            if(container == null){
+                let ele = createElementFromHTML(`
+                    <div class="card" data-profileID="${event.id}">
+                        <div class="card-header bg-warning">
+                            <a data-toggle="collapse" href="#process-container div[data-profileID='${event.id}'] .card-body" role="button" aria-expanded="false" class="font-weight-bold text-dark"><span class="profile-name">${event.profileName}</span></a>
+                        </div>
+                        <div class="card-body collapse show"> 
+                            <div class="form-group row">
+                                <label class="col-md-3 col-form-label"><small class="font-weight-bold">New User</small></label>
+                                <div class="col-sm-8">
+                                    <input type="text" readonly class="form-control-plaintext" value="0">
+                                </div>
+                            </div>
+                            <div class="form-group row">
+                                <label class="col-md-3 col-form-label"><i class="fas fa-star"></i></a></label>
+                                <div class="col-sm-8 form-control-plaintext">
+                                    <div class="progress">
+                                        <div class="progress-bar progress-favorites" role="progressbar" ></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group row">
+                                <label class="col-md-3 col-form-label"><i class="fas fa-clipboard"></i></a></label>
+                                <div class="col-sm-8 form-control-plaintext">
+                                    <div class="progress">
+                                        <div class="progress-bar  progress-notes" role="progressbar"  ></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group row">
+                                <label class="col-md-3 col-form-label"><i class="fas fa-comments"></i></a></label>
+                                <div class="col-sm-8 form-control-plaintext">
+                                    <div class="progress">
+                                        <div class="progress-bar progress-dialog" role="progressbar " style="width: 25%;" >25%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `)
+                document.querySelector("#process-container").append(ele)
+                container = ele
+            }
+
+            
+            container.querySelector("input").value = event.newUsers || 0
+
+            let favorite = Math.floor(((event.doneFavorites || 0)/(event.totalFavorites || 1)) * 100)
+            container.querySelector(".progress-favorites").textContent = `${favorite}%`
+            container.querySelector(".progress-favorites").style.width = `${favorite}%`
+
+            let notes = Math.floor(((event.doneNotes || 0)/(event.totalNotes || 1)) * 100)
+            container.querySelector(".progress-notes").textContent = `${notes}%`
+            container.querySelector(".progress-notes").style.width = `${notes}%`
+
+            let dialogs = Math.floor(((event.doneMessages || 0)/(event.totalMessages || 1)) * 100)
+            container.querySelector(".progress-dialog").textContent = `${dialogs}%`
+            container.querySelector(".progress-dialog").style.width = `${dialogs}%`
+
+        })
+    })
+
+</script>
+</html>
